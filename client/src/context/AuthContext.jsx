@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { hashPassword, verifyPassword } from '../utils/crypto'
-import api from '../api/axios'
 
 const AuthContext = createContext(null)
 const SESSION_KEY = 'arrise_auth'
@@ -83,21 +82,6 @@ export function AuthProvider({ children }) {
     return userData
   }
 
-  const loginWithGoogle = async (credential) => {
-    const res = await api.post('/auth/google', { credential })
-    const { token, user } = res.data
-    const userData = {
-      ...user,
-      username: user.username || user.email || user.id,
-      themePreference: user.themePreference || 'dark',
-      dailyGoal: user.dailyGoal || 3
-    }
-    saveToken(token)
-    saveSession({ method: 'google', token, user: userData })
-    setUser(userData)
-    return userData
-  }
-
   const logout = () => {
     clearSession()
     setUser(null)
@@ -130,7 +114,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser, loginWithGoogle }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   )

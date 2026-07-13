@@ -1,16 +1,12 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '318268727835-ujr87r6m9gdm605as9pii1a2qe48rlvq.apps.googleusercontent.com'
-
 export default function AuthPage() {
-  const { login, register, loginWithGoogle } = useAuth()
+  const { login, register } = useAuth()
   const [mode, setMode] = useState('login')
   const [form, setForm] = useState({ name: '', username: '', password: '' })
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState(null)
-  const [googleReady, setGoogleReady] = useState(false)
-  const googleButtonRef = useRef(null)
 
   const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
   const showMsg = (text, type = 'error') => setMsg({ text, type })
@@ -30,53 +26,6 @@ export default function AuthPage() {
     }
   }
 
-  const handleGoogleResponse = async (response) => {
-    if (!response?.credential) {
-      showMsg('Google sign-in failed. Please try again.', 'error')
-      return
-    }
-
-    clearMsg()
-    setLoading(true)
-    try {
-      await loginWithGoogle(response.credential)
-    } catch (err) {
-      showMsg(err.response?.data?.message || err.message || 'Google login failed. Please try again.', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    if (mode !== 'login') return
-
-    const initializeGoogleButton = () => {
-      if (window.google?.accounts?.id && googleButtonRef.current) {
-        googleButtonRef.current.innerHTML = ''
-        window.google.accounts.id.initialize({
-          client_id: GOOGLE_CLIENT_ID,
-          callback: handleGoogleResponse,
-          cancel_on_tap_outside: true
-        })
-        window.google.accounts.id.renderButton(googleButtonRef.current, {
-          theme: 'outline',
-          size: 'large',
-          width: '100%',
-          text: 'signin_with'
-        })
-        setGoogleReady(true)
-        return true
-      }
-      return false
-    }
-
-    if (!initializeGoogleButton()) {
-      const interval = setInterval(() => {
-        if (initializeGoogleButton()) clearInterval(interval)
-      }, 250)
-      return () => clearInterval(interval)
-    }
-  }, [mode])
 
   const handleForgot = (e) => {
     e.preventDefault()
@@ -181,19 +130,9 @@ export default function AuthPage() {
           </div>
 
           <div style={{ width: '100%' }}>
-            <div ref={googleButtonRef} />
-            {!googleReady && (
-              <button
-                type="button"
-                onClick={() => showMsg('Google login is loading. Please wait a moment.', 'info')}
-                style={googleBtnStyle}
-                onMouseOver={e => { e.currentTarget.style.background = '#f7f6f4'; e.currentTarget.style.borderColor = '#d3cfc7' }}
-                onMouseOut={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.borderColor = '#E3E3E3' }}
-              >
-                <GoogleIcon />
-                Continue with Google
-              </button>
-            )}
+            <p style={{ fontSize: 13, color: '#726c63', textAlign: 'center', margin: '0' }}>
+              Local accounts are used for this standalone experience.
+            </p>
           </div>
         </div>
 
@@ -236,21 +175,3 @@ const primaryBtnStyle = (disabled) => ({
   transition: 'background .15s ease'
 })
 
-const googleBtnStyle = {
-  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-  gap: 10, background: '#fff', border: '1px solid #E3E3E3',
-  borderRadius: 3, padding: 11, fontSize: 14, fontWeight: 600,
-  color: '#1c1b1a', cursor: 'pointer', fontFamily: 'inherit',
-  transition: 'background .15s ease, border-color .15s ease'
-}
-
-function GoogleIcon() {
-  return (
-    <svg viewBox="0 0 48 48" width={18} height={18}>
-      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.4 29.3 35 24 35c-6.1 0-11-4.9-11-11s4.9-11 11-11c2.8 0 5.3 1 7.3 2.7l6-6C33.9 6.4 29.2 4.5 24 4.5 12.9 4.5 4 13.4 4 24.5S12.9 44.5 24 44.5 44 35.6 44 24.5c0-1.4-.1-2.7-.4-4z"/>
-      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16 19 13 24 13c2.8 0 5.3 1 7.3 2.7l6-6C33.9 6.4 29.2 4.5 24 4.5c-7.6 0-14.1 4.3-17.4 10.6-.1.1-.2.4-.3.6z"/>
-      <path fill="#4CAF50" d="M24 44.5c5.1 0 9.7-1.9 13.3-5.1l-6.1-5.2C29.3 35.8 26.8 36.7 24 36.7c-5.2 0-9.6-3.5-11.2-8.3l-6.5 5C9.7 40 16.2 44.5 24 44.5z"/>
-      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.2 5.6l6.1 5.2C40.4 36 44 30.9 44 24.5c0-1.4-.1-2.7-.4-4z"/>
-    </svg>
-  )
-}

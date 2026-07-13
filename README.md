@@ -5,8 +5,9 @@ A full-stack personal productivity dashboard with authentication, per-user data,
 ## Tech Stack
 
 - **Frontend**: React + Vite + Tailwind CSS + Framer Motion + Lucide React
-- **Backend**: Node.js + Express + JWT Auth
-- **Database**: MongoDB (Mongoose)
+- **Data storage**: Browser localStorage
+- **Authentication**: Local accounts stored in browser-local storage
+- **Backend**: Not required for the standalone app
 
 ## Project Structure
 
@@ -14,43 +15,26 @@ A full-stack personal productivity dashboard with authentication, per-user data,
 arrise-daily-task-tracker/
 ├── client/          # React frontend
 │   └── src/
-│       ├── api/         # Axios instance
 │       ├── context/     # Auth context
-│       ├── components/  # Sidebar
+│       ├── components/  # UI components
 │       └── pages/       # Dashboard, Tasks, Habits, Notes, Streaks, Calendar, Settings
-└── server/          # Express API
-    ├── models/      # User, Task, Habit, HabitLog, Note, Streak
-    ├── routes/      # auth, tasks, habits, notes, streak, settings
-    └── middleware/  # JWT auth
 ```
 
 ## Setup
 
-### 1. MongoDB
-Install and run MongoDB locally, or use MongoDB Atlas.
-
-### 2. Server
-```bash
-cd server
-cp .env.example .env
-# Edit .env with your MONGO_URI and JWT_SECRET
-npm install
-npm run dev
-```
-
-### 3. Client
+### Client
 ```bash
 cd client
 npm install
 npm run dev
 ```
 
-App runs at `http://localhost:5173`, API at `http://localhost:5000`.
+App runs at `http://localhost:5173`.
 
 ## Features
 
-- Login / Register with JWT auth
-- Per-user isolated data
+- Login / Register with local password auth
+- Per-user isolated data stored in browser localStorage
 - Daily tasks with date picker and history
 - Weekly habit tracker (fully customizable)
 - Streak system with milestones

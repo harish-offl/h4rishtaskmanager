@@ -1,7 +1,7 @@
 // localStorage database — all data scoped per user
 function getUser() {
   try {
-    const s = JSON.parse(localStorage.getItem('arrise_session') || 'null')
+    const s = JSON.parse(localStorage.getItem('arrise_auth') || 'null')
     return s?.username || null
   } catch { return null }
 }
