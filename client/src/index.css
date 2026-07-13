@@ -138,23 +138,53 @@
   .dark .badge-neutral { background: rgba(255,255,255,0.08); color: #999; }
 
   /* ── TABLE ── */
-  .tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; table-layout: auto; }
   .tbl th {
     text-align: left; padding: 10px 14px;
     font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em;
     color: #777777; text-transform: uppercase;
     border-bottom: 1px solid #E3E3E3;
-    background: #FAFAFA; white-space: nowrap;
+    background: #FAFAFA;
+    white-space: normal; overflow-wrap: anywhere;
+    word-break: break-word;
+    position: sticky; top: 0; z-index: 2;
   }
   .dark .tbl th { border-color: #2A2A2A; background: #1A1A1A; color: #666; }
   .tbl td {
     padding: 11px 14px; border-bottom: 1px solid #F0F0F0;
     color: #333333; vertical-align: middle;
+    overflow-wrap: anywhere; word-break: break-word;
   }
   .dark .tbl td { border-color: #222; color: #CCCCCC; }
   .tbl tr:hover td { background: #FAFAFA; }
   .dark .tbl tr:hover td { background: #1E1E1E; }
   .tbl tr:last-child td { border-bottom: none; }
+
+  @media (max-width: 1100px) {
+    .tbl th:nth-child(7),
+    .tbl th:nth-child(8),
+    .tbl th:nth-child(9),
+    .tbl th:nth-child(10),
+    .tbl th:nth-child(11),
+    .tbl td:nth-child(7),
+    .tbl td:nth-child(8),
+    .tbl td:nth-child(9),
+    .tbl td:nth-child(10),
+    .tbl td:nth-child(11) {
+      display: none;
+    }
+  }
+
+  @media (max-width: 760px) {
+    .tbl { display: block; width: 100%; overflow-x: auto; }
+    .tbl thead, .tbl tbody, .tbl tr, .tbl th, .tbl td { display: block; }
+    .tbl thead { float: left; }
+    .tbl tr { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; border-bottom: 1px solid #F0F0F0; }
+    .tbl th, .tbl td { display: inline-flex; width: auto; min-width: 100px; }
+    .tbl th { position: relative; top: 0; white-space: normal; }
+    .tbl td { padding: 10px 12px; }
+    .tbl td:first-child { font-weight: 600; }
+  }
 
   /* ── PAGE TITLE ── */
   .page-title { font-size: 22px; font-weight: 700; color: #1F1F1F; letter-spacing: -0.4px; }
