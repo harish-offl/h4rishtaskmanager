@@ -202,7 +202,7 @@
   /* ── KANBAN COLUMN ── */
   .kanban-col {
     background: #F3F3F1; border-radius: 10px;
-    min-width: 240px; max-width: 260px; flex-shrink: 0;
+    min-width: 260px; max-width: 280px; flex: 0 0 280px;
     padding: 12px;
   }
   .dark .kanban-col { background: #1A1A1A; }
