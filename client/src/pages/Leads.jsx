@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react'
-import { Plus, Search, Filter, Download, Upload, Eye, Edit2, Trash2, UserPlus, MoreHorizontal } from 'lucide-react'
+import { Plus, Search, Filter, Download, Upload, Eye, Edit2, Trash2, UserPlus, MoreHorizontal, MessageSquare } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { uid, formatINR } from '../store/data'
 import Modal from '../components/ui/Modal'
@@ -333,6 +333,14 @@ export default function Leads() {
     setLeads(ls => ls.map(x => x.id === l.id ? { ...x, status: 'Converted' } : x))
   }
 
+  const openWhatsapp = (l) => {
+    const rawPhone = l.whatsapp || l.phone || ''
+    const digits = String(rawPhone).replace(/\D/g, '')
+    if (!digits) return toast.error('No phone number available for WhatsApp')
+    const message = encodeURIComponent(`Hi ${l.name || l.company || 'there'}, I wanted to connect with you about your lead.`)
+    window.open(`https://wa.me/${digits}?text=${message}`, '_blank')
+  }
+
   const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
 
   return (
@@ -383,7 +391,7 @@ export default function Leads() {
 
       {view === 'table' ? (
         <div className="card" style={{ overflow: 'hidden' }}>
-          <div style={{ overflowX: 'auto' }}>
+          <div className="table-scroll">
             <table className="tbl">
               <thead>
                 <tr>
@@ -412,6 +420,7 @@ export default function Leads() {
                       <div className="flex gap-1">
                         <button onClick={() => openView(l)} className="btn btn-ghost btn-xs" title="View"><Eye size={12} /></button>
                         <button onClick={() => openEdit(l)} className="btn btn-ghost btn-xs" title="Edit"><Edit2 size={12} /></button>
+                        <button onClick={() => openWhatsapp(l)} className="btn btn-whatsapp btn-xs" title="WhatsApp" style={{ whiteSpace:'nowrap' }}><MessageSquare size={12} /> WhatsApp</button>
                         <button onClick={() => convertToClient(l)} className="btn btn-ghost btn-xs" title="Convert"><UserPlus size={12} /></button>
                         <button onClick={() => setConfirmId(l.id)} className="btn btn-danger btn-xs" title="Delete"><Trash2 size={12} /></button>
                       </div>
