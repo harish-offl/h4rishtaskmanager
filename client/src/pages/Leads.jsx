@@ -335,9 +335,13 @@ export default function Leads() {
 
   const openWhatsapp = (l) => {
     const rawPhone = l.whatsapp || l.phone || ''
-    const digits = String(rawPhone).replace(/\D/g, '')
+    let digits = String(rawPhone).replace(/\D/g, '')
     if (!digits) return toast.error('No phone number available for WhatsApp')
-    const message = encodeURIComponent(`Hi ${l.name || l.company || 'there'}, I wanted to connect with you about your lead.`)
+    if (digits.length === 10) digits = `91${digits}`
+    const businessName = l.company || l.name || 'there'
+    const message = encodeURIComponent(
+      `Hi ${businessName},\n\nHope you're doing well. I'm reaching out from Arrise Digital. We help businesses grow through:\n\n• Social Media Marketing\n• Performance Marketing\n• Branding & Creative Design\n• Video Editing & Content Creation\n• Website Development\n\nWe would love to help your business build a stronger online presence and generate more customers.\n\nPortfolio: https://drive.google.com/drive/folders/1N38Auc3lYLmRJ3qmfFRqI0yIiBDAob0Y?usp=drive_link\nWebsite: https://arrisedigital.vercel.app\nContact: +91 93639 73591 / +91 73051 15192\n\nLet me know if you'd like to discuss how we can help your brand grow. Looking forward to connecting with you. `
+    )
     window.open(`https://wa.me/${digits}?text=${message}`, '_blank')
   }
 
