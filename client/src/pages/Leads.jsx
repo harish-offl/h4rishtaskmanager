@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { Plus, Search, Filter, Download, Upload, Eye, Edit2, Trash2, UserPlus, MoreHorizontal } from 'lucide-react'
 import { useApp } from '../context/AppContext'
 import { uid, formatINR } from '../store/data'
@@ -7,13 +7,186 @@ import StatusBadge from '../components/ui/StatusBadge'
 import ConfirmDialog from '../components/ui/ConfirmDialog'
 import toast from 'react-hot-toast'
 import { motion } from 'framer-motion'
+import * as XLSX from 'xlsx'
 
 const STATUSES = ['New','Not Contacted','Contacted','Follow-Up Required','Interested','Meeting Scheduled','Proposal Sent','Negotiation','Converted','Not Interested','Lost','On Hold']
 const PRIORITIES = ['Low','Medium','High','Urgent']
-const SOURCES = ['Instagram','Facebook','Google','LinkedIn','Referral','Walk-in','WhatsApp','Cold Call','Website','Other']
+const SOURCES = ['Google Maps Excel Import','Instagram','Facebook','Google','LinkedIn','Referral','Walk-in','WhatsApp','Cold Call','Website','Other']
 const SERVICES = ['Social Media Marketing','Video Editing','Graphic Design','Website Development','UI/UX Design','Photography','Videography','Content Creation','Meta Ads','Branding','Email Automation','AI Automation','Event Management','Other']
 
 const EMPTY = { name:'', company:'', phone:'', whatsapp:'', email:'', industry:'', category:'', location:'', source:'Instagram', service:'Social Media Marketing', value:'', assigned:'', priority:'Medium', status:'New', firstContact:'', lastContact:'', nextFollowup:'', expectedClose:'', notes:'' }
+
+const INPUT_HEADER_MAP = {
+  title: 'title',
+  companyname: 'title',
+  company: 'title',
+  totalscore: 'totalScore',
+  rating: 'totalScore',
+  reviewscount: 'reviewsCount',
+  reviews: 'reviewsCount',
+  street: 'street',
+  streetaddress: 'street',
+  street_address: 'street',
+  city: 'city',
+  state: 'state',
+  countrycode: 'countryCode',
+  country_code: 'countryCode',
+  country: 'countryCode',
+  website: 'website',
+  url: 'website',
+  phone: 'phone',
+  whatsapp: 'phone',
+  'categories/0': 'categories/0',
+  category: 'categories/0',
+  categories: 'categories/0'
+}
+
+const REQUIRED_HEADERS = ['title', 'phone']
+
+const CATEGORY_NORMALIZER = {
+  'cafe': 'Café',
+  'coffee shop': 'Café',
+  'restaurant': 'Restaurant',
+  'family restaurant': 'Restaurant',
+  'bakery': 'Bakery',
+  'juice shop': 'Juice Shop',
+  'ice cream shop': 'Juice Shop',
+  'fast food restaurant': 'Fast Food',
+  'pizza restaurant': 'Pizza Restaurant',
+  'chicken restaurant': 'Restaurant',
+  'vegetarian restaurant': 'Restaurant'
+}
+
+const DEFAULT_IMPORT_VALUES = {
+  service: 'Social Media Marketing',
+  source: 'Google Maps Excel Import',
+  assignedTo: 'Unassigned',
+  priority: 'Medium',
+  status: 'New',
+  estimatedValue: '0',
+  countryCode: '+91'
+}
+
+function normalizeCountryCode(code) {
+  if (!code) return '91'
+  const raw = String(code).trim()
+  const lower = raw.toLowerCase()
+  if (lower === 'in' || lower === 'india') return '91'
+  if (lower === 'us' || lower === 'usa' || lower === 'united states') return '1'
+  const digits = raw.replace(/\D/g, '')
+  if (digits === '91') return '91'
+  if (digits === '1') return '1'
+  return digits || '91'
+}
+
+function normalizePhone(rawPhone, countryCode) {
+  const digits = String(rawPhone || '').replace(/\D/g, '')
+  if (!digits) return ''
+  const cc = normalizeCountryCode(countryCode)
+  if (digits.startsWith(cc)) return digits
+  if (digits.length === 10) return cc + digits
+  return digits
+}
+
+function normalizeCategory(category) {
+  if (!category) return ''
+  const normalized = category.toString().trim().toLowerCase()
+  return CATEGORY_NORMALIZER[normalized] || category.toString().trim()
+}
+
+function detectHeaders(headers) {
+  const mapping = {}
+  headers.forEach(header => {
+    const normalizedHeader = String(header).trim().toLowerCase()
+    if (INPUT_HEADER_MAP[normalizedHeader]) mapping[header] = INPUT_HEADER_MAP[normalizedHeader]
+  })
+  return mapping
+}
+
+function normalizeInputRow(raw) {
+  const row = {}
+  Object.entries(raw).forEach(([key, value]) => {
+    const normalizedKey = INPUT_HEADER_MAP[String(key).trim().toLowerCase()] || key
+    row[normalizedKey] = value
+  })
+  return row
+}
+
+function parseExcelFile(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target.result)
+        const workbook = XLSX.read(data, { type: 'array' })
+        const sheet = workbook.Sheets[workbook.SheetNames[0]]
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' })
+        resolve(rows)
+      } catch (error) {
+        reject(error)
+      }
+    }
+    reader.onerror = reject
+    reader.readAsArrayBuffer(file)
+  })
+}
+
+function buildImportLead(raw, defaults, rowIndex) {
+  const title = String(raw.title || '').trim()
+  const phone = String(raw.phone || '').trim()
+  const countryCode = normalizeCountryCode(raw.countryCode || defaults.countryCode)
+  const normalizedPhone = normalizePhone(phone, countryCode)
+  const businessType = normalizeCategory(raw['categories/0'] || raw.category || '')
+  const rating = raw.totalScore !== undefined && raw.totalScore !== '' ? Number(raw.totalScore) : ''
+  const reviewsCount = raw.reviewsCount !== undefined && raw.reviewsCount !== '' ? Number(raw.reviewsCount) : ''
+  const streetAddress = String(raw.street || '').trim()
+  const city = String(raw.city || '').trim()
+  const state = String(raw.state || '').trim()
+  const location = [streetAddress, city, state].filter(Boolean).join(', ')
+  const errors = []
+  const warnings = []
+
+  if (!title) errors.push('Missing title')
+  if (!phone) errors.push('Missing phone')
+  if (rating !== '' && (Number.isNaN(rating) || rating < 0 || rating > 5)) warnings.push('Rating should be 0–5')
+  if (reviewsCount !== '' && (!Number.isInteger(reviewsCount) || reviewsCount < 0)) warnings.push('Reviews count must be a non-negative integer')
+
+  return {
+    id: `row-${rowIndex}`,
+    rowIndex,
+    title,
+    companyName: title,
+    leadName: '',
+    phone,
+    originalPhone: phone,
+    normalizedPhone,
+    whatsappNumber: normalizedPhone,
+    originalCountryCode: String(raw.countryCode || defaults.countryCode || ''),
+    countryCode,
+    website: String(raw.website || '').trim(),
+    businessType,
+    originalCategory: String(raw['categories/0'] || raw.category || '').trim(),
+    rating: rating === '' ? '' : rating,
+    reviewsCount: reviewsCount === '' ? '' : reviewsCount,
+    streetAddress,
+    city,
+    state,
+    service: defaults.service,
+    source: defaults.source,
+    assignedTo: defaults.assignedTo,
+    followUpDate: defaults.followUpDate || '',
+    priority: defaults.priority,
+    status: defaults.status,
+    estimatedValue: Number(defaults.estimatedValue || 0),
+    tags: '',
+    messageTemplate: '',
+    location,
+    importStatus: errors.length ? 'Invalid' : 'Valid',
+    errors,
+    warnings,
+    raw
+  }
+}
 
 export default function Leads() {
   const { leads, setLeads } = useApp()
@@ -26,7 +199,103 @@ export default function Leads() {
   const [editId, setEditId] = useState(null)
   const [confirmId, setConfirmId] = useState(null)
   const [page, setPage] = useState(1)
+  const [importModal, setImportModal] = useState(false)
+  const [importFileName, setImportFileName] = useState('')
+  const [importRows, setImportRows] = useState([])
+  const [importHeaders, setImportHeaders] = useState({})
+  const [importError, setImportError] = useState('')
+  const [importCounts, setImportCounts] = useState({ valid: 0, invalid: 0 })
+  const importInputRef = useRef(null)
   const PER = 10
+
+  const openImportPicker = () => importInputRef.current?.click()
+
+  const resetImportState = () => {
+    setImportModal(false)
+    setImportFileName('')
+    setImportRows([])
+    setImportHeaders({})
+    setImportError('')
+    setImportCounts({ valid: 0, invalid: 0 })
+  }
+
+  const handleImportFile = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+
+    setImportFileName(file.name)
+    setImportError('')
+    setImportRows([])
+    setImportHeaders({})
+    setImportCounts({ valid: 0, invalid: 0 })
+
+    try {
+      const rows = await parseExcelFile(file)
+      if (!rows.length) {
+        setImportError('The selected file contains no rows.')
+        setImportModal(true)
+        return
+      }
+
+      const headers = Object.keys(rows[0] || {})
+      const mapping = detectHeaders(headers)
+      const mappedKeys = Object.values(mapping)
+      const missingRequired = REQUIRED_HEADERS.filter(req => !mappedKeys.includes(req))
+
+      const normalizedRows = rows.map((raw, index) => buildImportLead(normalizeInputRow(raw), DEFAULT_IMPORT_VALUES, index + 1))
+      const validCount = normalizedRows.filter(r => r.importStatus === 'Valid').length
+      const invalidCount = normalizedRows.length - validCount
+
+      setImportHeaders(mapping)
+      setImportRows(normalizedRows)
+      setImportCounts({ valid: validCount, invalid: invalidCount })
+      setImportModal(true)
+
+      if (missingRequired.length) {
+        setImportError(`Missing required headers: ${missingRequired.join(', ')}`)
+      }
+    } catch (error) {
+      setImportError('Unable to parse the selected file. Please choose a valid XLSX, XLS, or CSV file with headers.')
+      setImportModal(true)
+    }
+  }
+
+  const importLeads = () => {
+    const validRows = importRows.filter(r => r.importStatus === 'Valid')
+    if (!validRows.length) {
+      toast.error('No valid rows available to import.')
+      return
+    }
+
+    setLeads(ls => [
+      ...validRows.map(row => ({
+        id: uid(),
+        name: row.title || row.companyName || `Lead ${row.rowIndex}`,
+        company: row.companyName,
+        phone: row.normalizedPhone,
+        whatsapp: row.whatsappNumber,
+        email: '',
+        industry: '',
+        category: row.businessType,
+        location: row.location,
+        source: row.source,
+        service: row.service,
+        value: row.estimatedValue,
+        assigned: row.assignedTo,
+        priority: row.priority,
+        status: row.status,
+        nextFollowup: row.followUpDate,
+        expectedClose: '',
+        notes: `Imported from ${importFileName}`,
+        createdAt: new Date().toISOString()
+      })),
+      ...ls
+    ])
+
+    toast.success(`${validRows.length} leads imported successfully.`)
+    resetImportState()
+  }
 
   const filtered = useMemo(() => leads.filter(l => {
     const mq = !q || [l.name, l.company, l.phone, l.email, l.service].join(' ').toLowerCase().includes(q.toLowerCase())
@@ -78,9 +347,11 @@ export default function Leads() {
           <button onClick={() => setView(v => v === 'table' ? 'kanban' : 'table')} className="btn btn-ghost btn-sm">
             {view === 'table' ? 'Kanban View' : 'Table View'}
           </button>
+          <button onClick={openImportPicker} className="btn btn-secondary btn-sm"><Upload size={14} /> Import Excel</button>
           <button onClick={openAdd} className="btn btn-primary btn-sm"><Plus size={14} /> Add Lead</button>
         </div>
       </div>
+      <input ref={importInputRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleImportFile} />
 
       {/* Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -173,6 +444,68 @@ export default function Leads() {
       {/* View Modal */}
       <Modal open={modal === 'view'} onClose={() => setModal(null)} title="Lead Details" maxW="580px">
         <LeadView lead={form} onEdit={() => { setEditId(form.id); setModal('edit') }} />
+      </Modal>
+
+      <Modal open={importModal} onClose={resetImportState} title="Import Leads from Excel" maxW="760px">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {importFileName && <p style={{ fontSize: 13, color: '#555' }}>File: <strong>{importFileName}</strong></p>}
+          {importError && <div style={{ color: '#D9534F', background: '#F8D7DA', padding: 12, borderRadius: 8 }}>{importError}</div>}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="card" style={{ padding: 12 }}>
+              <p style={{ fontSize: 12, color: '#777', marginBottom: 8 }}>Detected Headers</p>
+              {Object.keys(importHeaders).length ? (
+                <ul style={{ margin: 0, paddingLeft: 16 }}>
+                  {Object.entries(importHeaders).map(([raw, mapped]) => (
+                    <li key={raw}><strong>{raw}</strong> → {mapped}</li>
+                  ))}
+                </ul>
+              ) : <p style={{ fontSize: 12, color: '#AAA' }}>No exact import headers detected.</p>}
+            </div>
+            <div className="card" style={{ padding: 12 }}>
+              <p style={{ fontSize: 12, color: '#777', marginBottom: 8 }}>Import Summary</p>
+              <p style={{ fontSize: 13, marginBottom: 6 }}>Rows: <strong>{importRows.length}</strong></p>
+              <p style={{ fontSize: 13, marginBottom: 6 }}>Valid: <strong>{importCounts.valid}</strong></p>
+              <p style={{ fontSize: 13, marginBottom: 6 }}>Invalid: <strong>{importCounts.invalid}</strong></p>
+            </div>
+          </div>
+          <div style={{ maxHeight: 320, overflow: 'auto' }}>
+            <table className="tbl" style={{ minWidth: 680 }}>
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Company</th>
+                  <th>Phone</th>
+                  <th>Country</th>
+                  <th>Website</th>
+                  <th>Category</th>
+                  <th>Status</th>
+                  <th>Errors</th>
+                </tr>
+              </thead>
+              <tbody>
+                {importRows.length === 0 && (
+                  <tr><td colSpan={8} style={{ textAlign: 'center', padding: 30, color: '#AAA' }}>No import rows to preview.</td></tr>
+                )}
+                {importRows.slice(0, 20).map(row => (
+                  <tr key={row.id} style={{ opacity: row.importStatus === 'Invalid' ? 0.7 : 1 }}>
+                    <td>{row.rowIndex}</td>
+                    <td>{row.companyName || '—'}</td>
+                    <td>{row.normalizedPhone || '—'}</td>
+                    <td>{row.countryCode || '—'}</td>
+                    <td>{row.website || '—'}</td>
+                    <td>{row.businessType || '—'}</td>
+                    <td>{row.importStatus}</td>
+                    <td style={{ fontSize: 11, color: '#D9534F' }}>{row.errors.join(', ')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex gap-3 justify-end pt-2">
+            <button className="btn btn-ghost btn-sm" onClick={resetImportState}>Cancel</button>
+            <button className="btn btn-primary btn-sm" onClick={importLeads} disabled={!importRows.length || importCounts.valid === 0}>Import Valid Leads</button>
+          </div>
+        </div>
       </Modal>
 
       <ConfirmDialog open={!!confirmId} onClose={() => setConfirmId(null)} onConfirm={() => remove(confirmId)} message="Delete this lead? This cannot be undone." />
